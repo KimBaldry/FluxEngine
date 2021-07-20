@@ -155,7 +155,7 @@ def CreateOutputTree(topdir,continuing=False):
          raise Exception("Output directory: %s already exists - please specify a new one that does not exist."%topdir)
 
       #Make the topdir directory
-      os.makedirs(topdir)
+      os.mkdir(topdir)
 
       #Make all the other sub directories
       os.mkdir(outputdirectory['socat']) #SOCAT outputs

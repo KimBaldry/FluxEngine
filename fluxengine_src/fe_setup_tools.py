@@ -19,9 +19,10 @@ import socket; #for gethostname
 import calendar;
 from datetime import date, timedelta, datetime;
 import fnmatch; #matching file globs
+import numpy
 from numpy import cumsum;
 
-import fe_core as fluxengine
+import fe_core_append_insitu as fluxengine
 import rate_parameterisation as k_params; #This is where k parameterisation logic is kept.
 import data_preprocessing as data_preprocessing; #preprocessing functions
 import process_indicator_layers as indicator_layers; #Process indicator layer functors
@@ -227,7 +228,6 @@ def verify_config_variables(configVariables, metadata, verbose=False):
         days, time = configVariables["temporal_resolution"].split(" ");
         hours, minutes = time.split(":");
         configVariables["temporal_resolution"] = timedelta(days=int(days), hours=int(hours), minutes=int(minutes));
-        
         #tmpTime = datetime.strptime(configVariables["temporal_resolution"], "%d %H:%M");
         #configVariables["temporal_resolution"] = timedelta(days=tmpTime.day, hours=tmpTime.hour, minutes=tmpTime.minute);
         if verbose:
@@ -252,35 +252,35 @@ def verify_config_variables(configVariables, metadata, verbose=False):
         raise ValueError("%s: use_sstskin is set but no sstskin inputfile (sstskin_path) was specified in the config file." % function);
 
 
-#Substitutes various time tokens into the input string.
-#Does not modify the original arguments.
-#Accounts for leap years correctly.
-#curDatetime should be a datetime object.
-def substitute_tokens(inputStr, curDatetime):
-    year = curDatetime.year;
-    month = curDatetime.month;
-    day = curDatetime.day;
-    hour = curDatetime.hour;
-    minute = curDatetime.minute;
+# #Substitutes various time tokens into the input string.
+# #Does not modify the original arguments.
+# #Accounts for leap years correctly.
+# #curDatetime should be a datetime object.
+# def substitute_tokens(inputStr, curDatetime):
+#     year = curDatetime.year;
+#     month = curDatetime.month;
+#     day = curDatetime.day;
+#     hour = curDatetime.hour;
+#     minute = curDatetime.minute;
 
-    outputStr = inputStr;
-    outputStr = outputStr.replace("<YYYY>", str(year));
-    outputStr = outputStr.replace("<YY>", str(year)[-2:]);
-    outputStr = outputStr.replace("<MM>", "%02d"%(month));
-    outputStr = outputStr.replace("<M>", str(month)); #numeric month with no 0 padding
-    outputStr = outputStr.replace("<MMM>", calendar.month_abbr[month].upper());
-    outputStr = outputStr.replace("<Mmm>", calendar.month_abbr[month]);
-    outputStr = outputStr.replace("<mmm>", calendar.month_abbr[month].lower());
-    outputStr = outputStr.replace("<DD>", "%02d"%day); #<DD> day of the month
+#     outputStr = inputStr;
+#     outputStr = outputStr.replace("<YYYY>", str(year));
+#     outputStr = outputStr.replace("<YY>", str(year)[-2:]);
+#     outputStr = outputStr.replace("<MM>", "%02d"%(month));
+#     outputStr = outputStr.replace("<M>", str(month)); #numeric month with no 0 padding
+#     outputStr = outputStr.replace("<MMM>", calendar.month_abbr[month].upper());
+#     outputStr = outputStr.replace("<Mmm>", calendar.month_abbr[month]);
+#     outputStr = outputStr.replace("<mmm>", calendar.month_abbr[month].lower());
+#     outputStr = outputStr.replace("<DD>", "%02d"%day); #<DD> day of the month
         
-    #<DDD> day of the year
-    cumulativeDaysByMonth = [0] + list(cumsum([calendar.monthrange(year, m)[1] for m in range(1,12)])); #Cumulative days in each month of the year (accounting for leap years)
-    outputStr = outputStr.replace("<DDD>", "%03d"%(day+cumulativeDaysByMonth[month-1])); #Day number in year, starting at 1 (up to 365 or 366 on leap years)
+#     #<DDD> day of the year
+#     cumulativeDaysByMonth = [0] + list(cumsum([calendar.monthrange(year, m)[1] for m in range(1,12)])); #Cumulative days in each month of the year (accounting for leap years)
+#     outputStr = outputStr.replace("<DDD>", "%03d"%(day+cumulativeDaysByMonth[month-1])); #Day number in year, starting at 1 (up to 365 or 366 on leap years)
     
-    outputStr = outputStr.replace("<hh>", "%02d"%hour); #<hh> hours in 24 hour time.
-    outputStr = outputStr.replace("<mm>", "%02d"%minute) #<mm> mintue past the hour
+#     outputStr = outputStr.replace("<hh>", "%02d"%hour); #<hh> hours in 24 hour time.
+#     outputStr = outputStr.replace("<mm>", "%02d"%minute) #<mm> mintue past the hour
 
-    return outputStr;
+#     return outputStr;
 
 
 #Returns a list of filepaths which match a glob
@@ -308,19 +308,19 @@ def match_filenames(givenPath, glob):
 #   varMetadata:        Metadata for configuration files
 #   curTimePoint:       Current datetime of the time point to run
 #   executionCount:     Number of previous executions in this set (used to group output files temporally).
-def create_run_parameters(configVariables, varMetadata, curTimePoint, executionCount, processTimeStr, configFile, processIndicatorLayersOff, previousRunParams):
+def create_run_parameters(configVariables, varMetadata,  processTimeStr, configFile, processIndicatorLayersOff):
     function = inspect.stack()[0][1]+", "+inspect.stack()[0][3];
     
     runParams = {};
     #Copy over misc. parameters
     #runParams["year"] = 2000 if clArgs.use_takahashi_validation==True else runParams["year"] = year;
-    runParams["year"] = curTimePoint.year;
-    runParams["month"] = curTimePoint.month;
-    runParams["day"] = curTimePoint.day;
-    runParams["hour"] = curTimePoint.hour;
-    runParams["minute"] = curTimePoint.minute;
-    runParams["second"] = curTimePoint.second;
-    runParams["run_count"] = executionCount;
+#     runParams["year"] = curTimePoint.year;
+#     runParams["month"] = curTimePoint.month;
+#     runParams["day"] = curTimePoint.day;
+#     runParams["hour"] = curTimePoint.hour;
+#     runParams["minute"] = curTimePoint.minute;
+#     runParams["second"] = curTimePoint.second;
+#     runParams["run_count"] = executionCount;
     runParams["hostname"] = socket.gethostname();
     runParams["config_file"] = configFile;
     runParams["src_home"] = configVariables["src_home"];
@@ -335,22 +335,19 @@ def create_run_parameters(configVariables, varMetadata, curTimePoint, executionC
         #DataLayerPaths: These can change based on month and year.
         if varName in varMetadata:
             if varMetadata[varName]["type"] == varMetadata[varName]["type"] == "DataLayerPath":
-                pathGlob = substitute_tokens(configVariables[varName], curTimePoint); #substitute time tokens into the path/glob
-                curDir = path.dirname(pathGlob); #Directory to search in.
-                curGlob = path.basename(pathGlob); #File glob to match against.
-                #print "path:", curPath
+                pathGlob = configVariables[varName]; #substitute time tokens into the path/glob
+                curDir = path.dirname(configFile); #Directory to search in.
+                curGlob = path.basename(pathGlob); #File glob to match against.                #print "path:", curPath
                 #print "glob:", curGlob;
                 try:
                     matches = match_filenames(curDir, curGlob);
                     matches = [match for match in matches if match.rsplit('/', 1)[-1][0] != '.']; #Remove hidden metadata files created by MACOS on some file systems. Required if sharing folders between MACOS and LINUX/WINDOWS.
-                    
+                    runParams["LOG_PATH"] = path.join(curDir,'Fe.log') # was missing so added K.B.
                     #If there's exactly one match for the file glob, add the data layer.
                     if len(matches) == 1: #Store the file path.
                         dataLayerName = varName[0:-5];
-                        runParams[dataLayerName+"_infile"] = path.join(curDir, matches[0]);
+                        runParams[dataLayerName+"_infile"] = path.join(matches[0]);
                         runParams[dataLayerName+"_prod"] = configVariables[dataLayerName+"_prod"];
-                        runParams[dataLayerName+"_stddev_prod"] = configVariables[dataLayerName+"_stddev_prod"] if dataLayerName+"_stddev_prod" in configVariables else None;
-                        runParams[dataLayerName+"_count_prod"] = configVariables[dataLayerName+"_count_prod"] if dataLayerName+"_count_prod" in configVariables else None;
                         
                         if dataLayerName+"_preprocessing" in configVariables:
                             runParams[dataLayerName+"_preprocessing"] = configVariables[dataLayerName+"_preprocessing"];
@@ -383,23 +380,15 @@ def create_run_parameters(configVariables, varMetadata, curTimePoint, executionC
             raise ValueError("%s: Error finding unique file matches for one or more input data layers." % (function));
             return None;
             
-
     #Output file/path
-    outputChunk = executionCount%runParams["output_temporal_chunking"];
-    #runParams["output_chunk"] = int(outputChunk); #if 0 a new file will be created, otherwise it will be append to previous chunk
+    outputRoot = configVariables["output_dir"];
+    outputFile = configVariables["output_file"];
     
-    if outputChunk == 0: #Will need to create a new file
-        outputRoot = configVariables["output_dir"];
-        outputStructure = substitute_tokens(configVariables["output_structure"], curTimePoint);
-        outputFile = substitute_tokens(configVariables["output_file"], curTimePoint);
-    
-        runParams["output_dir"] = path.join(outputRoot, outputStructure); #root output directory
-        runParams["output_path"] = path.join(outputRoot, outputStructure, outputFile);
-    else: #Output will be appended to previous file
-        runParams["output_dir"] = previousRunParams["output_dir"];
-        runParams["output_path"] = previousRunParams["output_path"];
+    runParams["output_dir"] = path.join(outputRoot); #root output directory
+    runParams["output_path"] = path.join(outputRoot, outputFile);
     
     return runParams;
+
 
 def list_input_datalayers(runParameters, metadata):
     dataLayers = [];
@@ -497,10 +486,10 @@ def fe_obj_from_run_parameters(runParameters, metadata, processLayersOff=True, v
     ###Add additional k parameterisation components:                      
     #linear additive k/krain for rain case - adding rain component to the results from the existing choice of parameterisation
     if (runParameters["k_rain_linear_ho1997_switch"] == 1):
-        fe.add_k_parameterisation_component(k_params.AddKRainLinearHo1997());
+        fe.add_k_parameterisation_component(k_params.AddKRainLinearHo19997());
     
     #nonlinear changes to k/krain for rain and wind - parameterisation from Harrison et al., JGR 2012, equations 11, 12, 13, 14
-    if runParameters["k_rain_nonlinear_h2012_switch"] == 1:# and runParameters["k_parameterisation"] == 9): #9==generic_k
+    if (runParameters["k_rain_nonlinear_h2012_switch"] == 1 and runParameters["k_parameterisation"] == 9): #9==generic_k
         fe.add_k_parameterisation_component(k_params.AddKRainNonlinearHarrison2012());
     
     
@@ -511,8 +500,6 @@ def fe_obj_from_run_parameters(runParameters, metadata, processLayersOff=True, v
             preprocessingFuncs = get_preprocessing_funcs(runParameters[dataLayerName+"_preprocessing"]);
             status = fe.add_data_layer(dataLayerName, runParameters[dataLayerName+"_infile"],
                                        runParameters[dataLayerName+"_prod"],
-                                       stddevProd=runParameters[dataLayerName+"_stddev_prod"], #Note: if no stddev or count data then these are set to None
-                                       countProd=runParameters[dataLayerName+"_count_prod"],
                                        preprocessing=preprocessingFuncs);
             if status == False:
                 break;
@@ -568,7 +555,7 @@ def generate_datetime_points(startStr, endStr, deltaTime=None, singleDate=False)
 
 
 #Takes a config file, a list of years and months, and runs the flux engine for each month/year combination.
-def run_fluxengine(configFilePath, startDate, endDate, singleRun=False, verbose=False, processLayersOff=True,
+def run_fluxengine(reanalysis_out, configFilePath, singleRun=False, verbose=False, processLayersOff=True,
                    takahashiDriver=False, pco2DirOverride=None, outputDirOverride=None, dailyResolution=False):
     function = inspect.stack()[0][1]+", "+inspect.stack()[0][3];
     hostname = socket.gethostname();
@@ -576,21 +563,21 @@ def run_fluxengine(configFilePath, startDate, endDate, singleRun=False, verbose=
     if verbose:
         print "Hostname identified as: ", hostname;
         print "Working directory is: ", rootPath;
-    
+
     #Parse config file
     configPath = path.join(configFilePath); #Don't make configFilePath absolute!
-    configVariables = read_config_file(configPath, verbose=verbose);
-    
+    configVariables = read_config_file(configPath, verbose=verbose); ## good with new edits K.B.
+
     #Parse settings file for default metadata about the config variables
     settingsPath = path.join(rootPath, "fluxengine_src", "settings.xml");
-    metadata = read_config_metadata(settingsPath, verbose=verbose);
-    
+    metadata = read_config_metadata(settingsPath, verbose=verbose); ## good with new edits K.B.
+
     #Append custom datalayers to metadata file, this means they will be automatically added as a datalayer
     for varName in configVariables.keys():
         if (varName not in metadata) and (varName[-5:] == "_path"):
             varBase = varName[:-5];
             metadata[varName] = {"required":"false", "type":"DataLayerPath", "name":varBase};
-    
+
     #Substitute commandline override arguments (-pco2_dir_override, -output_dir_override)
     if (pco2DirOverride != None):
         print "Using optional override for pCO2w data directory. '%s' will be set to '%s' (ie overriding both directory of pco2 data and selection in the configuration file)." % (configVariables["pco2"], pco2DirOverride);
@@ -598,101 +585,104 @@ def run_fluxengine(configFilePath, startDate, endDate, singleRun=False, verbose=
     if (outputDirOverride != None):
         configVariables["output_dir"] = path.abspath(path.expanduser(outputDirOverride));
         print "Using optional override for output directory, output_dir will be set to %s (overriding the configuration file value)." % (outputDirOverride);
-    
+
     #Printing some feedback...
     if processLayersOff == True and verbose:
         print "Switching off generation of processing indicator layers. This reduces the processing time by appx. 50% (switch: process_layers_off).";
         #configVariables["process_indicator_layers"] = None;
     if takahashiDriver == True and verbose:
         print "This is a takahashi validation run. Ensure config is the configs/takahashi09_validation.conf file supplied with FluxEngine.";
-    
+
     #Using the metadata, process the config variables appropriately
     #Checks types are valid, converts strings to the data types required by fluxengine
     #Checks data layers contain at least a prod and path, etc.
-    verify_config_variables(configVariables, metadata, verbose=verbose);
-    
+    verify_config_variables(configVariables, metadata, verbose=verbose); ## bad with new edits K.B. Checks fail on an unknown variable, pco2_data_selection, and time_resolution (and maybe more)
+
     ############
     ##TODO:
     #Alert user to any unused variables (can we infer all required variables yet?).    
     #Error if required variable hasn't been specified.
     ############
-    
-    
+
+
     #Begin main execution logic
     processTimeStr = time.strftime("%d/%m/%Y %H:%M:%S");
     print "Executing on '%s' at %s" % (hostname, processTimeStr);
-    
+
     #Generate a list of datetime objects overwhich to run the simulations
-    timePoints = generate_datetime_points(startDate, endDate, deltaTime=configVariables["temporal_resolution"], singleDate=singleRun);
+    #timePoints = generate_datetime_points(startDate, endDate, deltaTime=configVariables["temporal_resolution"], singleDate=singleRun);
+    # addition by K.B
+    #t_data = numpy.array([[reanalysis_out['yr'], reanalysis_out['mon'], reanalysis_out['day']]]).T;
+    #timePoints = [datetime(*x) for x in t_data];
+
+
     #print "num timepoints:", len(timePoints);
     #input("key to continue...");
-    for i, timePoint in enumerate(timePoints):
+    ### ______________________________________________
+    # we want to run flux engine for every point not for every month/year
+    ### ----------------------------------------------
+    #for i, timePoint in enumerate(timePoints):
         #Run parameters can vary depending on the current month and year (e.g. paths and filenames,
         #So these must be generated on a per-month/year basis.
-        try:
-            if i==0:
-                runParameters = None; #Creates an empty previous runParameters... TODO: tidy this and the create_run_parameters function
-            runParameters = create_run_parameters(configVariables, metadata, timePoint, i, processTimeStr, configFilePath, processLayersOff, runParameters);
-            
-            #TODO: Takahashi driver switch should be removed from future releases and moved to the configuration file.
-            if takahashiDriver == True:
-                runParameters["TAKAHASHI_DRIVER"] = True;
-            else:
-                runParameters["TAKAHASHI_DRIVER"] = False;
-        except ValueError as e:
-            print e.args;
-            return;
-        except OSError as e:
-            print e.args;
-            return;
+       # try:
+            #if i==0:
+    runParameters = create_run_parameters(configVariables, metadata, processTimeStr, configFilePath, processLayersOff);
+
+    #TODO: Takahashi driver switch should be removed from future releases and moved to the configuration file.
+    if takahashiDriver == True:
+       runParameters["TAKAHASHI_DRIVER"] = True;
+    else:
+       runParameters["TAKAHASHI_DRIVER"] = False;
+
+
+    #Create output file path
+    try:
+       if path.exists(runParameters["output_dir"]) == False:
+           makedirs(runParameters["output_dir"]);
+    except OSError as e:
+       print "Couldn't create output directory '%s'. Do you have write access?" % runParameters["output_dir"];
+       print type(e), e.args;
+
+    #Create fluxengine object to use runParameters
+    fe = fe_obj_from_run_parameters(runParameters, metadata, processLayersOff, verbose=False);
+       
         
-        #Create output file path
-        try:
-            if path.exists(runParameters["output_dir"]) == False:
-                makedirs(runParameters["output_dir"]);
-        except OSError as e:
-            print "Couldn't create output directory '%s'. Do you have write access?" % runParameters["output_dir"];
-            print type(e), e.args;
-        
-        #Create fluxengine object to use runParameters
-        fe = fe_obj_from_run_parameters(runParameters, metadata, processLayersOff, verbose=False);
-        
-        
-        #Run fluxengine            
-        if fe != None:
-            returnCode = fe.run();
-        
-        #Check for successful run, if one fails don't run the rest.
-        if returnCode != 0:
-            print ("%s: There was an error running flux engine:\n\n"%function), e.args[0];
-            print "Exiting...";
-            return (returnCode, fe);
-        else:
-            print "Flux engine exited with exit code:", returnCode;
-            print "%02d"%timePoint.day, calendar.month_abbr[timePoint.month], timePoint.year, "%02d:%02d:%02d completed successfully.\n"%(timePoint.hour, timePoint.minute, timePoint.second);
+    #Run fluxengine            
+    if fe != None:
+        returnCode = fe.run();
+
+    #Check for successful run, if one fails don't run the rest.
+    if returnCode != 0:
+        print ("%s: There was an error running flux engine:\n\n"%function), e.args[0];
+        print "Exiting...";
+        return (returnCode, fe);
+    else:
+        print "Flux engine exited with exit code:", returnCode;
+        print "completed successfully.\n";
+
 
     return (returnCode, fe); #return code, FluxEngine object.
 
 
-##returns a dictionary the initialisation requirements for each rate parameterisation object (classes derived from KCalculationBase).
-#def list_available_rate_parameterisations():
-#    #function = inspect.stack()[0][1]+", "+inspect.stack()[0][3];
-#    
-#    rateParameterisations = {};
-#    #try:
-#    #iterate through each element of k_params and append their names
-#    for name, obj in inspect.getmembers(k_params):
-#        if inspect.isclass(obj) == True:
-#            #Get a handle to the class type
-#            #try:
-#            #check it is a rate parameterisation class
-#            ClassHandle = getattr(k_params, name);
-#            if issubclass(ClassHandle, k_params.KCalculationBase):
-#                #get initialiser arguments
-#                initialiserArgNames = [arg for arg in inspect.getargspec(ClassHandle.__init__).args if arg != "self"];
-#                rateParameterisations[name] = initialiserArgNames;
-#                        
-#    return rateParameterisations;
+    ##returns a dictionary the initialisation requirements for each rate parameterisation object (classes derived from KCalculationBase).
+    #def list_available_rate_parameterisations():
+    #    #function = inspect.stack()[0][1]+", "+inspect.stack()[0][3];
+    #    
+    #    rateParameterisations = {};
+    #    #try:
+    #    #iterate through each element of k_params and append their names
+    #    for name, obj in inspect.getmembers(k_params):
+    #        if inspect.isclass(obj) == True:
+    #            #Get a handle to the class type
+    #            #try:
+    #            #check it is a rate parameterisation class
+    #            ClassHandle = getattr(k_params, name);
+    #            if issubclass(ClassHandle, k_params.KCalculationBase):
+    #                #get initialiser arguments
+    #                initialiserArgNames = [arg for arg in inspect.getargspec(ClassHandle.__init__).args if arg != "self"];
+    #                rateParameterisations[name] = initialiserArgNames;
+    #                        
+    #    return rateParameterisations;
 
 
 

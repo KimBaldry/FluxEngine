@@ -18,7 +18,7 @@ def v2_f_conversion_wrap(jds,data_array,Tcls,Peq_cls,extrapolatetoyear=None):
     Also returns result as a structured array.
    """
    #Run the conversion function
-   jd, yr, mon, day, hh, mm, ss, lon, lat, SST_C, Tcl_C, fCO2_SST, fCO2_Tym_final, pCO2_SST, pCO2_Tym_final, qf = v2_f_conversion(jds, data_array['year'],data_array['month'],data_array['day'],data_array['hour'],data_array['minute'],data_array['second'],
+   jd, yr, mon, day, hh, mm, ss, lon, lat, SST_C, Tcl_C, fCO2_SST, fCO2_Tym_final, pCO2_SST, pCO2_Tym_final, qf, goodpoints = v2_f_conversion(jds, data_array['year'],data_array['month'],data_array['day'],data_array['hour'],data_array['minute'],data_array['second'],
                                                       data_array['longitude'], data_array['latitude'], data_array['sst'],data_array['salinity'], data_array['T_equ'], 
                                                       data_array['air_pressure'], data_array['air_pressure_equ'], data_array['salinity_sub'],data_array['air_pressure_sub'], 
                                                       data_array['fCO2'], Tcls, Peq_cls,extrapolatetoyear);
@@ -43,7 +43,8 @@ def v2_f_conversion_wrap(jds,data_array,Tcls,Peq_cls,extrapolatetoyear=None):
                                            ('fCO2_Tym',np.float),
                                            ('pCO2_SST',np.float),
                                            ('pCO2_Tym',np.float),
-                                           ('qf',np.int)]);
+                                           ('qf',np.int),
+                                          ('goodpoints',np.int)]);
       result['jd']=jd
       result['yr']=yr;
       result['mon']=mon;
@@ -60,6 +61,7 @@ def v2_f_conversion_wrap(jds,data_array,Tcls,Peq_cls,extrapolatetoyear=None):
       result['pCO2_SST']=pCO2_SST
       result['pCO2_Tym']=pCO2_Tym_final
       result['qf']=qf
+      result['goodpoints']=np.array(goodpoints, '<i8')
 
    return result
 
@@ -206,5 +208,5 @@ def v2_f_conversion(jds, yrs, mons, days, hhs, mms, sss, lons, lats, SST_Cs, sal
    fCO2_SST *= 1E+06 # uatm (this is the same as fCO2_rec)
    pCO2_SST *= 1E+06 # uatm
 
-   return [jd, yr, mon, day, hh, mm, ss, lon, lat, SST_C, Tcl_C, fCO2_SST, fCO2_Tym_final, pCO2_SST, pCO2_Tym_final, qf];
+   return [jd, yr, mon, day, hh, mm, ss, lon, lat, SST_C, Tcl_C, fCO2_SST, fCO2_Tym_final, pCO2_SST, pCO2_Tym_final, qf, goodpoints];
 

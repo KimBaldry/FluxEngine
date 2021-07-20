@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
-from netCDF4 import Dataset
+import pandas as pd
 from numpy import flipud, ma, ravel, transpose, full, array, squeeze;
 from numpy import all as npall;
 from debug_tools import calc_mean;
@@ -48,10 +48,10 @@ class DataLayer:
     DEBUG = False;
     
     @classmethod
-    def create_empty_datalayer(cls, name, nx, ny, metadata, fillValue=None):
+    def create_empty_datalayer(cls, name, n, metadata, fillValue=None):
         if fillValue == None:
             fillValue = DataLayer.missing_value;
-        data = full((ny, nx), fillValue);
+        data = full(n, fillValue);
         return cls(name, data, metadata, fillValue);
     
     #preprocessing is a list of functions to modify fdata
@@ -60,60 +60,26 @@ class DataLayer:
     #Throws ValueError if an unexpected number of dimensions are found
     #TODO: transposeData should be handled as a preprocessing function
     @classmethod
-    def create_from_file(cls, name, infile, prod, metadata, timeIndex, transposeData=False, preprocessing=None):
+    def create_from_file(cls, name, infile, prod, metadata, transposeData=False, preprocessing=None):
         function = "(DataLayer.create_from_file)"
         
         #Open netCDF file
         try:
-            dataset = Dataset(infile);
+            dataset = pd.read_table(infile, sep="\t");
         except IOError as e:
             print "\n%s: %s inputfile %s does not exist" % (function, name, infile)
             print e.args;
         
         #Check netCDF file: Prints some info when in DEBUG mode.
-        check_input(infile, prod, DataLayer.DEBUG);
+        #check_input(infile, prod, DataLayer.DEBUG);
         
         #Open netCDF file and check variable exists.
-        dataset = Dataset(infile);
-        ncVariable = dataset.variables[prod];
+        dataset = pd.read_table(infile, sep="\t");
+        data = dataset[prod];
         
-        #Find the right time dimension index and slice/copy the data appropriately
-        dims = ncVariable.dimensions;
-        
-        #Two spatial dimensions and a time dimensions
-        if len(dims) == 3:
-            if metadata.timeDimensionName in dims:
-                if dims.index(metadata.timeDimensionName) == 0:
-                    data = ncVariable[timeIndex, :, :];
-                elif dims.index(metadata.timeDimensionName) == 1:
-                    data = ncVariable[:, timeIndex, :];
-                elif dims.index(metadata.timeDimensionName) == 2:
-                    data = ncVariable[:, :, timeIndex];
-            else:
-                raise RuntimeError("Time dimension name ('%s') for Datalayer '%s' was not found. Try setting this manually in the configuration file using (for example) datalayername_timeDimensionName = time"%(metadata.timeDimensionName, name));
-        #No time dimension anyway
-        elif len(dims) == 2:
-            data = ncVariable[:];
-        else: #
-            raise RuntimeError("Invalid number of dimensions (%d) when reading datalayer '%s' from '%s'"%(len(dims), name, infile));
-        
+
         #TODO: APPLY PREPROCESSING HERE instead of later.
-        
-
-        #Extract just the dimensions we want.
-        #requiredDims = [None if v in ['latitude', 'lat', 'longitude', 'lon'] else 0 for v in ncVariable.dimensions]
-        #data = squeeze(ncVariable[slice(*requiredDims)]);
-        if data.shape == (1, 1, 1): #Remove temporal dimension
-            data.shape = (1, 1);
-        
-        if data.shape != (1, 1): #Don't squeeze if there is a single lon/lat point or we'll end up with an empty array
-            data = squeeze(data); #Remove any 1d dimensions.
-
-        #check number of dimensions
-        dataDims = data.shape;
-        if len(dataDims) != 2:
-            raise ValueError("\n%sError: Unexpected number of dimensions (%d) in %s when reading in %s variable from %s" % (function, len(dataDims), name, prod, infile));
-        
+                
         #Convert from a masked array (np.ma.array) to a plain np.array
         data = array(data);
         
@@ -122,17 +88,7 @@ class DataLayer:
         #    TODO: now irrelevent as we convert to standard arrays?
         if ma.isMaskedArray(data) and (npall(data.mask) == True):
               data.mask = False; #Remove the mask...
-                
-        #If necessary flip the data #TODO: remove this as this should be handled in the pre-processing functions by the user
-        data, flipped = flip_data(dataset, data, name); #If different from takahashi orientation, flip data.
-
-        #Extract fill value from netCDF if it exists. Note that this will overwrite fill default or config specified fill value.
-        if hasattr(ncVariable, "_FillValue"):
-            fillValue = ncVariable._FillValue;
-        elif hasattr(ncVariable, "fill_value"):
-            fillValue = ncVariable.fill_value;
-        else:
-            fillValue = DataLayer.missing_value;
+        fillValue = DataLayer.missing_value;
         
         return cls(name, data, metadata, fillValue, preprocessing=preprocessing);
         
@@ -141,8 +97,7 @@ class DataLayer:
         #function = "(DataLayer.__init__)";
         self.name = name; #Human readable name for the data layer
         self.data = data;
-        self.ny = data.shape[0];
-        self.nx = data.shape[1];
+        self.n = len(data);
         self.missing_value = DataLayer.missing_value;
         
         #Copy over all metadata attributes. Note: this also copies over name - not sure this is a good thing

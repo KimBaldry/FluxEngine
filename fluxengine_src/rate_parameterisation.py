@@ -380,7 +380,7 @@ class k_Ho1997(KCalculationBase):
         return ["windu10", "windu10_moment2", "windu10_moment3", "scskin", "rain"];
         
     def output_names(self):
-        return ["k", "krain"];
+        return ["k_", "krain"];
     
     def __call__(self, data):
         function = "(rate_parameterisation.py: k_Ho1997.__call__)";
@@ -488,7 +488,8 @@ class k_generic(KCalculationBase):
         self.k_generic_sc = k_generic_sc;
         
         if self.k_generic_sc != 600 and self.k_generic_sc != 660:
-            raise ValueError("%s: Could not initialise k_generic rate parameterisation. Only schmidt numbers (k_generic_sc) of 600 and 660 are allowed, but a schmidt number of %d was provided." % (function, k_generic_sc));
+            raise ValueError("%s: Could not initialise k_generic rate parameterisation. Only 
+                             midt numbers (k_generic_sc) of 600 and 660 are allowed, but a schmidt number of %d was provided." % (function, k_generic_sc));
     
     def input_names(self):
         return ["windu10", "windu10_moment2", "windu10_moment3", "scskin"];
@@ -854,7 +855,7 @@ class AddKRainNonlinearHarrison2012(KCalculationExtension):
               winddrag_fdata[i] = DataLayer.missing_value
         
         for i in arange(length):
-            if ( (self.k[i] != DataLayer.missing_value) and (self.scskin[i] != DataLayer.missing_value) and (self.rain[i] != DataLayer.missing_value) and (self.scskin[i] > 0.0) and (self.windu10[i] != DataLayer.missing_value) and (self.windu10_moment2[i] != DataLayer.missing_value) and (self.windu10_moment3[i] != DataLayer.missing_value) and (self.pressure[i] != DataLayer.missing_value) and (self.sstskin[i] != DataLayer.missing_value) and (windstress_fdata[i] != DataLayer.missing_value)):
+            if ( (self.k[i] != DataLayer.missing_value) and (self.scskin[i] != DataLayer.missing_value) and (self.rain[i] != DataLayer.missing_value) and (self.scskin[i] > 0.0) and (self.windu10[i] != DataLayer.missing_value) and (self.windu10_moment2[i] != DataLayer.missing_value) and (self.windu10_moment3[i] != DataLayer.missing_value) and (self.pressure[i] != DataLayer.missing_value) and (self.sstskin[i] != DataLayer.missing_value) and (self.windstress_fdata[i] != DataLayer.missing_value)):
                 #guts in here
                 # data["pressure"].fdata are in mb, need it in Pascals, so *100 to get Pascals (ie convert from mb to P)
                 rho_a = (self.pressure[i]*100.0) /(R*self.sstskin[i])    
